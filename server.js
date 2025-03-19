@@ -1,10 +1,15 @@
-// server.js
 import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import subcategoryRoutes from "./routes/subcategoryRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
+
+import authRoutes from "./routes/auth.js";
+import adminRoutes from "./routes/admin.js";
+import { verifyToken } from "./middleware/auth.js";
 
 // Load environment variables
 dotenv.config();
@@ -14,13 +19,31 @@ connectDB();
 
 const app = express();
 
+// Configure CORS with options for cookies to work properly
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:5173", // Vite default port
+    credentials: true, // Allow cookies to be sent with requests
+  })
+);
+
+// Cookie parser middleware
+app.use(cookieParser());
+
 // Body parser middleware
 app.use(express.json());
 
 // Mount routes
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", verifyToken, adminRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/subcategories", subcategoryRoutes);
 app.use("/api/products", productRoutes);
+
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "ok", message: "Server is running" });
+});
 
 // Root route
 app.get("/", (req, res) => {
