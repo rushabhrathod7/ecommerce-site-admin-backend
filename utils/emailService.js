@@ -16,7 +16,9 @@ export const sendPasswordResetEmail = async (
   resetToken,
   frontendUrl
 ) => {
-  const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+  // const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+
+  const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
 
   const message = {
     from: process.env.EMAIL_FROM || '"Admin System" <admin@example.com>',

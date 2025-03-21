@@ -166,18 +166,19 @@ router.post("/forgot-password", async (req, res) => {
     // Find admin by email
     const admin = await Admin.findOne({ email });
     if (!admin) {
-      // We don't want to reveal whether an email exists in our database
       return res.status(200).json({
         message:
           "If that email exists in our system, a password reset link has been sent",
       });
     }
 
-    // Generate reset token
+    // ✅ Generate reset token on the instance
     const resetToken = admin.generatePasswordResetToken();
+
+    // ✅ Save the changes to the database
     await admin.save();
 
-    // Send password reset email
+    // ✅ Send password reset email
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
     await sendPasswordResetEmail(email, resetToken, frontendUrl);
 
@@ -227,6 +228,9 @@ router.post("/reset-password/:token", async (req, res) => {
     console.error("Reset password error:", error);
     res.status(500).json({ message: "Server error during password reset" });
   }
+  // console.log("Received token:", resetToken);
+  // console.log("Hashed received token:", resetPasswordToken);
+  // console.log("Admin found with token:", Admin ? "Yes" : "No");
 });
 
 export default router;

@@ -19,7 +19,7 @@ const createSuperAdmin = async () => {
       // Create superadmin
       const superAdmin = new Admin({
         username: "superadmin",
-        email: "rathodrhushabh@gmail.com",
+        email: "ecommercesite02@outlook.com",
         password: "Admin123!", // Will be hashed before saving
         role: "superadmin",
         isActive: true,
