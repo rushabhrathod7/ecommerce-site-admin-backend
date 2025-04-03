@@ -19,6 +19,11 @@ const categorySchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Add image field to store Cloudinary image data
+    image: {
+      public_id: String,
+      url: String
+    }
   },
   {
     timestamps: true,

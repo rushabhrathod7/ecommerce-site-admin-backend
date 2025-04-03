@@ -106,6 +106,22 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// Auth check route - simple endpoint to verify if a user is authenticated
+router.get("/check", verifyToken, async (req, res) => {
+  try {
+    // If verifyToken middleware passed, the user is authenticated
+    // Return minimal info to confirm authentication
+    res.status(200).json({ 
+      authenticated: true,
+      adminId: req.admin.id,
+      role: req.admin.role
+    });
+  } catch (error) {
+    console.error("Auth check error:", error);
+    res.status(500).json({ message: "Server error during auth check" });
+  }
+});
+
 // Logout route
 router.post("/logout", (req, res) => {
   res.clearCookie("admin_token");

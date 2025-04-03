@@ -2,6 +2,7 @@
 import Product from "../models/Product.js";
 import Category from "../models/Category.js";
 import Subcategory from "../models/Subcategory.js";
+import cloudinary from "../config/cloudinary.js";
 
 // Get all products with filtering, sorting, and pagination
 export const getAllProducts = async (req, res) => {
@@ -116,36 +117,31 @@ export const getProduct = async (req, res) => {
   }
 };
 
-// Create a new product
+// Create a new product with image uploads
 export const createProduct = async (req, res) => {
   try {
-    // Check if category and subcategory exist and are related
-    const category = await Category.findById(req.body.category);
-    if (!category) {
-      return res.status(404).json({
-        success: false,
-        message: "Category not found",
-      });
+    // Get the product data from the request body
+    const productData = { ...req.body };
+    
+    // Handle images directly from request body (new direct Cloudinary integration)
+    // Images are now sent as part of the JSON data rather than files
+    if (req.body.images) {
+      // If images are sent as a string (happens when using FormData), parse them
+      if (typeof req.body.images === 'string') {
+        try {
+          productData.images = JSON.parse(req.body.images);
+        } catch (e) {
+          productData.images = [];
+        }
+      }
+    } else {
+      productData.images = [];
     }
 
-    const subcategory = await Subcategory.findById(req.body.subcategory);
-    if (!subcategory) {
-      return res.status(404).json({
-        success: false,
-        message: "Subcategory not found",
-      });
-    }
+    // Create the product
+    const product = await Product.create(productData);
 
-    // Validate that subcategory belongs to the specified category
-    if (subcategory.category.toString() !== req.body.category) {
-      return res.status(400).json({
-        success: false,
-        message: "Subcategory does not belong to the specified category",
-      });
-    }
-
-    const product = await Product.create(req.body);
-
+    // Return the created product
     res.status(201).json({
       success: true,
       data: product,
@@ -162,74 +158,49 @@ export const createProduct = async (req, res) => {
 // Update a product
 export const updateProduct = async (req, res) => {
   try {
-    // If category or subcategory is being updated, perform validation
-    if (req.body.category || req.body.subcategory) {
-      let categoryId = req.body.category;
-      let subcategoryId = req.body.subcategory;
-
-      // If only one is being updated, get the current values
-      if (!categoryId || !subcategoryId) {
-        const currentProduct = await Product.findById(req.params.id);
-        if (!currentProduct) {
-          return res.status(404).json({
-            success: false,
-            message: "Product not found",
-          });
-        }
-
-        categoryId = categoryId || currentProduct.category;
-        subcategoryId = subcategoryId || currentProduct.subcategory;
-      }
-
-      // Check if category exists
-      if (req.body.category) {
-        const category = await Category.findById(categoryId);
-        if (!category) {
-          return res.status(404).json({
-            success: false,
-            message: "Category not found",
-          });
-        }
-      }
-
-      // Check if subcategory exists
-      if (req.body.subcategory) {
-        const subcategory = await Subcategory.findById(subcategoryId);
-        if (!subcategory) {
-          return res.status(404).json({
-            success: false,
-            message: "Subcategory not found",
-          });
-        }
-
-        // Validate relationship if both category and subcategory are being updated
-        if (
-          req.body.category &&
-          subcategory.category.toString() !== categoryId.toString()
-        ) {
-          return res.status(400).json({
-            success: false,
-            message: "Subcategory does not belong to the specified category",
-          });
-        }
-      }
-    }
-
-    const product = await Product.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
-
+    const productId = req.params.id;
+    
+    // Get the product data from the request body
+    const productData = { ...req.body };
+    
+    // Find the product to update
+    const product = await Product.findById(productId);
+    
     if (!product) {
       return res.status(404).json({
         success: false,
         message: "Product not found",
       });
     }
+    
+    // Handle images directly from request body (new direct Cloudinary integration)
+    // Images are now sent as part of the JSON data rather than files
+    if (req.body.images) {
+      // If images are sent as a string (happens when using FormData), parse them
+      if (typeof req.body.images === 'string') {
+        try {
+          productData.images = JSON.parse(req.body.images);
+        } catch (e) {
+          // Keep existing images if parsing fails
+          productData.images = product.images;
+        }
+      }
+    }
 
+    // Update the product
+    const updatedProduct = await Product.findByIdAndUpdate(
+      productId,
+      productData,
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    // Return the updated product
     res.status(200).json({
       success: true,
-      data: product,
+      data: updatedProduct,
     });
   } catch (error) {
     res.status(400).json({
@@ -252,7 +223,14 @@ export const deleteProduct = async (req, res) => {
       });
     }
 
-    // Instead of product.remove()
+    // Delete all product images from Cloudinary
+    if (product.images && product.images.length > 0) {
+      for (const image of product.images) {
+        await cloudinary.uploader.destroy(image.public_id);
+      }
+    }
+
+    // Delete the product
     await Product.deleteOne({ _id: product._id });
 
     res.status(200).json({
@@ -293,6 +271,97 @@ export const searchProducts = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to search products",
+      error: error.message,
+    });
+  }
+};
+
+// Upload product images
+export const uploadProductImages = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please upload at least one image",
+      });
+    }
+
+    const uploadPromises = req.files.map(async (file) => {
+      const result = await cloudinary.uploader.upload(file.path, {
+        folder: "products",
+        use_filename: true,
+        unique_filename: true,
+      });
+      
+      return {
+        public_id: result.public_id,
+        url: result.secure_url
+      };
+    });
+
+    const uploadedImages = await Promise.all(uploadPromises);
+    
+    // Append new images to existing ones
+    product.images = [...product.images, ...uploadedImages];
+    await product.save();
+
+    res.status(200).json({
+      success: true,
+      data: product,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: "Failed to upload images",
+      error: error.message,
+    });
+  }
+};
+
+// Delete product image
+export const deleteProductImage = async (req, res) => {
+  try {
+    const { id, imageId } = req.params;
+    
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    const imageIndex = product.images.findIndex(img => img.public_id === imageId);
+    if (imageIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Image not found",
+      });
+    }
+
+    // Delete image from Cloudinary
+    await cloudinary.uploader.destroy(imageId);
+
+    // Remove image from product
+    product.images.splice(imageIndex, 1);
+    await product.save();
+
+    res.status(200).json({
+      success: true,
+      data: product,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: "Failed to delete image",
       error: error.message,
     });
   }

@@ -6,6 +6,7 @@ import connectDB from "./config/db.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import subcategoryRoutes from "./routes/subcategoryRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
 
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
@@ -22,7 +23,7 @@ const app = express();
 // Configure CORS with options for cookies to work properly
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173", // Vite default port
+    origin: [process.env.FRONTEND_URL || "http://localhost:5173", "https://api.cloudinary.com"],
     credentials: true, // Allow cookies to be sent with requests
   })
 );
@@ -39,6 +40,7 @@ app.use("/api/admin", verifyToken, adminRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/subcategories", subcategoryRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/upload", uploadRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

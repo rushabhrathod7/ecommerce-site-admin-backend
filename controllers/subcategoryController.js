@@ -2,6 +2,7 @@
 import Subcategory from "../models/Subcategory.js";
 import Category from "../models/Category.js";
 import Product from "../models/Product.js";
+import cloudinary from "../config/cloudinary.js";
 
 // Get all subcategories
 export const getAllSubcategories = async (req, res) => {
@@ -102,11 +103,7 @@ export const updateSubcategory = async (req, res) => {
       }
     }
 
-    const subcategory = await Subcategory.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
+    const subcategory = await Subcategory.findById(req.params.id);
 
     if (!subcategory) {
       return res.status(404).json({
@@ -115,9 +112,34 @@ export const updateSubcategory = async (req, res) => {
       });
     }
 
+    // If there's a new image and an old image exists, delete the old one
+    if (req.body.image && subcategory.image && subcategory.image.public_id !== req.body.image.public_id) {
+      try {
+        await cloudinary.uploader.destroy(subcategory.image.public_id);
+      } catch (cloudinaryError) {
+        console.error("Failed to delete old image from cloudinary:", cloudinaryError);
+        // Continue with update even if cloudinary delete fails
+      }
+    }
+
+    // If image is explicitly set to null, delete the existing image
+    if (req.body.image === null && subcategory.image && subcategory.image.public_id) {
+      try {
+        await cloudinary.uploader.destroy(subcategory.image.public_id);
+      } catch (cloudinaryError) {
+        console.error("Failed to delete image from cloudinary:", cloudinaryError);
+      }
+    }
+
+    const updatedSubcategory = await Subcategory.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+
     res.status(200).json({
       success: true,
-      data: subcategory,
+      data: updatedSubcategory,
     });
   } catch (error) {
     res.status(400).json({
@@ -138,6 +160,16 @@ export const deleteSubcategory = async (req, res) => {
         success: false,
         message: "Subcategory not found",
       });
+    }
+
+    // Delete the subcategory image from cloudinary if it exists
+    if (subcategory.image && subcategory.image.public_id) {
+      try {
+        await cloudinary.uploader.destroy(subcategory.image.public_id);
+      } catch (cloudinaryError) {
+        console.error("Failed to delete image from cloudinary:", cloudinaryError);
+        // Continue with deletion even if cloudinary delete fails
+      }
     }
 
     // Instead of subcategory.remove()
