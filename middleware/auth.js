@@ -29,6 +29,7 @@ export const verifyAdminToken = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('Decoded token:', decoded);
 
     const admin = await Admin.findById(decoded.id);
     if (!admin || !admin.isActive) {
@@ -41,11 +42,15 @@ export const verifyAdminToken = async (req, res, next) => {
 
     req.admin = {
       id: decoded.id,
-      role: decoded.role,
+      role: admin.role || 'admin', // Default to 'admin' if role is not set
+      email: admin.email,
+      isActive: admin.isActive
     };
 
+    console.log('Admin info set in request:', req.admin);
     next();
   } catch (error) {
+    console.error('Token verification error:', error);
     const errorMsg =
       error.name === 'TokenExpiredError'
         ? 'Token expired. Please login again'
@@ -186,4 +191,33 @@ export const verifyClerkWebhook = async (req, res, next) => {
       error: 'Webhook verification failed' 
     });
   }
+};
+
+// Middleware to authorize based on role
+export const authorize = (...roles) => {
+    return (req, res, next) => {
+        console.log('Authorization check:', {
+            admin: req.admin,
+            requiredRoles: roles,
+            currentRole: req.admin?.role
+        });
+
+        if (!req.admin) {
+            return res.status(401).json({
+                success: false,
+                message: 'Not authenticated',
+                error: 'NOT_AUTHENTICATED'
+            });
+        }
+
+        if (!roles.includes(req.admin.role)) {
+            return res.status(403).json({
+                success: false,
+                message: `Not authorized. Required roles: ${roles.join(', ')}`,
+                error: 'NOT_AUTHORIZED'
+            });
+        }
+
+        next();
+    };
 };

@@ -3,10 +3,17 @@ import Product from "../models/Product.js";
 import Category from "../models/Category.js";
 import Subcategory from "../models/Subcategory.js";
 import cloudinary from "../../shared/config/cloudinary.js";
+import mongoose from "mongoose";
 
 // Get all products with filtering, sorting, and pagination
 export const getAllProducts = async (req, res) => {
   try {
+    console.log('=== Product Request Debug ===');
+    console.log('Headers:', req.headers);
+    console.log('Query params:', req.query);
+    console.log('URL params:', req.params);
+    console.log('Auth token:', req.headers.authorization);
+    
     // Copy query object
     const queryObj = { ...req.query };
 
@@ -29,6 +36,8 @@ export const getAllProducts = async (req, res) => {
     if (req.params.subcategoryId) {
       filterOptions.subcategory = req.params.subcategoryId;
     }
+
+    console.log('Filter options:', filterOptions);
 
     // Initial query
     let query = Product.find(filterOptions)
@@ -64,13 +73,24 @@ export const getAllProducts = async (req, res) => {
 
     query = query.skip(skip).limit(limit);
 
+    console.log('Executing query:', query.getQuery());
+    
+    // Debug: Check if database is connected
+    console.log('Database connection state:', mongoose.connection.readyState);
+    
+    // Debug: Try a simple find query first
+    const allProducts = await Product.find({});
+    console.log('All products in DB:', allProducts.length);
+    
     // Execute query
     const products = await query;
+    console.log('Found products:', JSON.stringify(products, null, 2));
 
     // Get total count for pagination
     const total = await Product.countDocuments(filterOptions);
+    console.log('Total products count:', total);
 
-    res.status(200).json({
+    const response = {
       success: true,
       count: products.length,
       total,
@@ -80,8 +100,12 @@ export const getAllProducts = async (req, res) => {
         limit,
       },
       data: products,
-    });
+    };
+
+    console.log('Sending response:', JSON.stringify(response, null, 2));
+    res.status(200).json(response);
   } catch (error) {
+    console.error('Error in getAllProducts:', error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch products",

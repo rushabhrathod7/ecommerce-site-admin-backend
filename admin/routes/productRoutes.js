@@ -11,9 +11,8 @@ import {
   uploadProductImages,
   deleteProductImage
 } from "../controllers/productController.js";
-import { verifyAdminToken } from "../../middleware/auth.js";
 
-const router = express.Router({ mergeParams: true });
+const router = express.Router();
 
 // Set up multer for file uploads
 const storage = multer.diskStorage({
@@ -46,10 +45,10 @@ router.get("/", getAllProducts);
 router.get("/:id", getProduct);
 
 // Protected routes (admin only)
-router.post("/", verifyAdminToken, upload.array('images', 5), createProduct);
-router.put("/:id", verifyAdminToken, upload.array('images', 5), updateProduct);
-router.delete("/:id", verifyAdminToken, deleteProduct);
-router.post("/:id/images", verifyAdminToken, upload.array('images', 5), uploadProductImages);
-router.delete("/:id/images/:imageId", verifyAdminToken, deleteProductImage);
+router.post("/", upload.array('images', 5), createProduct);
+router.put("/:id", upload.array('images', 5), updateProduct);
+router.delete("/:id", deleteProduct);
+router.post("/:id/images", upload.array('images', 5), uploadProductImages);
+router.delete("/:id/images/:imageId", deleteProductImage);
 
 export default router;

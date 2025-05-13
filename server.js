@@ -9,6 +9,7 @@ import adminRoutes from "./admin/routes/admin.js";
 import categoryRoutes from "./admin/routes/categoryRoutes.js";
 import subcategoryRoutes from "./admin/routes/subcategoryRoutes.js";
 import productRoutes from "./admin/routes/productRoutes.js";
+import adminOrderRoutes from "./admin/routes/orderRoutes.js";
 
 // User routes
 import userRoutes from "./user/routes/userRoutes.js";
@@ -47,10 +48,21 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Mount routes
 app.use("/api/auth", authRoutes);
-app.use("/api", publicRoutes); // Public routes for products, categories, etc.
-app.use("/api/admin", verifyAdminToken, adminRoutes);
-app.use("/api/users", userRoutes); // Changed from /api/user to /api/users
-app.use("/api/upload", uploadRoutes);
+app.use("/api", publicRoutes);
+app.use("/api/uploads", uploadRoutes);
+
+// Apply admin authentication middleware to all admin routes
+app.use("/api/admin", verifyAdminToken);
+
+// Mount admin routes
+app.use("/api/admin", adminRoutes);
+app.use("/api/admin/categories", categoryRoutes);
+app.use("/api/admin/subcategories", subcategoryRoutes);
+app.use("/api/admin/products", productRoutes);
+app.use("/api/admin/orders", adminOrderRoutes);
+
+// User routes
+app.use("/api/user", userRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/orders", orderRoutes);
 

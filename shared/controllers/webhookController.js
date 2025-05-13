@@ -39,6 +39,8 @@ export const processWebhook = async (req, res) => {
  */
 async function handleUserCreated(data) {
   try {
+    console.log('Received user.created webhook data:', JSON.stringify(data, null, 2));
+    
     // Check if user already exists
     const existingUser = await User.findOne({ clerkId: data.id });
     if (existingUser) {
@@ -71,6 +73,8 @@ async function handleUserCreated(data) {
  */
 async function handleUserUpdated(data) {
   try {
+    console.log('Received user.updated webhook data:', JSON.stringify(data, null, 2));
+    
     // Find and update the user
     const updatedUser = await User.findOneAndUpdate(
       { clerkId: data.id },

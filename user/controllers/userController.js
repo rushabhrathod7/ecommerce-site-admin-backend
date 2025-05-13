@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import Order from '../models/Order.js';
 import Product from '../../admin/models/Product.js';
+import { clerkClient } from '@clerk/clerk-sdk-node';
 
 /**
  * Get all users with optional filtering
@@ -169,14 +170,13 @@ export const syncUserFromClerk = async (req, res) => {
   try {
     const { clerkId } = req.params;
     
-    // This would use your Clerk SDK to fetch user data
-    // For this example, we'll assume you pass the Clerk user data in the request body
-    const clerkUserData = req.body;
+    // Fetch user data from Clerk
+    const clerkUser = await clerkClient.users.getUser(clerkId);
     
-    if (!clerkUserData || !clerkUserData.id) {
-      return res.status(400).json({ 
+    if (!clerkUser) {
+      return res.status(404).json({ 
         success: false, 
-        error: 'Invalid Clerk user data' 
+        error: 'User not found in Clerk' 
       });
     }
     
@@ -184,17 +184,24 @@ export const syncUserFromClerk = async (req, res) => {
     const user = await User.findOneAndUpdate(
       { clerkId },
       {
-        email: clerkUserData.email_addresses?.[0]?.email_address || '',
-        firstName: clerkUserData.first_name || '',
-        lastName: clerkUserData.last_name || '',
-        username: clerkUserData.username || '',
-        profileImageUrl: clerkUserData.profile_image_url || '',
-        emailVerified: clerkUserData.email_addresses?.[0]?.verification?.status === 'verified',
-        metadata: clerkUserData.public_metadata || {},
+        email: clerkUser.emailAddresses[0]?.emailAddress || '',
+        firstName: clerkUser.firstName || '',
+        lastName: clerkUser.lastName || '',
+        username: clerkUser.username || '',
+        profileImageUrl: clerkUser.profileImageUrl || '',
+        emailVerified: clerkUser.emailAddresses[0]?.verification?.status === 'verified',
+        metadata: clerkUser.publicMetadata || {},
         updatedAt: new Date()
       },
       { new: true, upsert: true }
     );
+    
+    console.log('Synced user from Clerk:', {
+      clerkId,
+      firstName: clerkUser.firstName,
+      lastName: clerkUser.lastName,
+      email: clerkUser.emailAddresses[0]?.emailAddress
+    });
     
     return res.status(200).json({ success: true, data: user });
   } catch (error) {
@@ -365,6 +372,136 @@ export const getUserReviews = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching user reviews:', error);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+};
+
+/**
+ * Get user by email
+ */
+export const getUserByEmail = async (req, res) => {
+  try {
+    const { email } = req.params;
+    
+    const user = await User.findOne({ email }).select('-__v');
+    
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    
+    return res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    console.error('Error fetching user by email:', error);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+};
+
+/**
+ * Sync user with Clerk by MongoDB ID
+ */
+export const syncUserById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // First get the user from our database
+    const user = await User.findById(id);
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'User not found in database' 
+      });
+    }
+
+    if (!user.clerkId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'User does not have a Clerk ID' 
+      });
+    }
+    
+    // Fetch user data from Clerk
+    const clerkUser = await clerkClient.users.getUser(user.clerkId);
+    
+    if (!clerkUser) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'User not found in Clerk' 
+      });
+    }
+    
+    // Update user with Clerk data
+    const updatedUser = await User.findByIdAndUpdate(
+      id,
+      {
+        email: clerkUser.emailAddresses[0]?.emailAddress || user.email,
+        firstName: clerkUser.firstName || user.firstName,
+        lastName: clerkUser.lastName || user.lastName,
+        username: clerkUser.username || user.username,
+        profileImageUrl: clerkUser.profileImageUrl || user.profileImageUrl,
+        emailVerified: clerkUser.emailAddresses[0]?.verification?.status === 'verified',
+        metadata: clerkUser.publicMetadata || user.metadata,
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
+    
+    console.log('Synced user from Clerk:', {
+      id,
+      clerkId: user.clerkId,
+      firstName: clerkUser.firstName,
+      lastName: clerkUser.lastName,
+      email: clerkUser.emailAddresses[0]?.emailAddress
+    });
+    
+    return res.status(200).json({ success: true, data: updatedUser });
+  } catch (error) {
+    console.error('Error syncing user from Clerk:', error);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+};
+
+/**
+ * Update user's name
+ */
+export const updateUserName = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { firstName, lastName } = req.body;
+    
+    if (!firstName && !lastName) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'At least one of firstName or lastName is required' 
+      });
+    }
+    
+    const updateData = {};
+    if (firstName) updateData.firstName = firstName;
+    if (lastName) updateData.lastName = lastName;
+    
+    const user = await User.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true }
+    );
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'User not found' 
+      });
+    }
+    
+    console.log('Updated user name:', {
+      id,
+      firstName: user.firstName,
+      lastName: user.lastName
+    });
+    
+    return res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    console.error('Error updating user name:', error);
     return res.status(500).json({ success: false, error: 'Server error' });
   }
 };

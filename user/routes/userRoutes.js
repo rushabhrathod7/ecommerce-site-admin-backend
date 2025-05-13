@@ -4,13 +4,16 @@ import {
   getAllUsers, 
   getUserByClerkId, 
   getUserById,
+  getUserByEmail,
   updateUserMetadata,
   deleteUser,
   syncUserFromClerk,
+  syncUserById,
   updateUserDetails,
   updateUserAddress,
   getUserOrders,
-  getUserReviews
+  getUserReviews,
+  updateUserName
 } from '../controllers/userController.js';
 import { processWebhook } from '../../shared/controllers/webhookController.js';
 import { verifyAdminToken, verifyClerkAuth, verifyClerkWebhook } from '../../middleware/auth.js';
@@ -29,10 +32,13 @@ router.post('/webhook', verifyClerkWebhook, processWebhook);
 
 router.get('/', verifyAdminToken, getAllUsers);
 router.get('/clerk/:clerkId', verifyClerkAuth, getUserByClerkId);
+router.get('/email/:email', verifyAdminToken, getUserByEmail);
 router.get('/id/:id', verifyClerkAuth, getUserById);
 router.patch('/metadata/:clerkId', verifyClerkAuth, updateUserMetadata);
 router.delete('/:clerkId', verifyAdminToken, deleteUser);
 router.post('/sync/:clerkId', verifyAdminToken, syncUserFromClerk);
+router.post('/sync/id/:id', verifyAdminToken, syncUserById);
+router.patch('/:id/name', verifyAdminToken, updateUserName);
 
 // New user routes
 router.patch('/:id', verifyClerkAuth, updateUserDetails);
