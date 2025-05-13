@@ -2,7 +2,8 @@ import express from 'express';
 import { 
     getAllOrders, 
     getOrderDetails, 
-    updateOrderStatus 
+    updateOrderStatus,
+    deleteOrder
 } from '../controllers/orderController.js';
 import { verifyAdminToken, authorize } from '../../middleware/auth.js';
 
@@ -17,6 +18,7 @@ router.route('/')
 
 router.route('/:id')
     .get(getOrderDetails)
-    .patch(updateOrderStatus);
+    .patch(updateOrderStatus)
+    .delete(deleteOrder);
 
 export default router; 

@@ -3,6 +3,7 @@ import { Clerk } from '@clerk/clerk-sdk-node';
 import Admin from '../admin/models/Admin.js';
 import User from '../user/models/User.js';
 import crypto from 'crypto';
+import { Webhook } from 'svix';
 
 // Initialize Clerk
 const clerk = new Clerk({ 
@@ -166,24 +167,27 @@ export const verifyClerkWebhook = async (req, res, next) => {
       });
     }
 
-    // Verify webhook signature
-    const payload = JSON.stringify(req.body);
-    const signedContent = `${svixId}.${svixTimestamp}.${payload}`;
-    const secret = process.env.CLERK_WEBHOOK_SECRET;
+    // Create a new Svix instance with your webhook secret
+    const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
     
-    const expectedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(signedContent)
-      .digest('hex');
-
-    if (signature !== expectedSignature) {
+    try {
+      // Verify the webhook payload
+      const evt = wh.verify(JSON.stringify(req.body), {
+        'svix-id': svixId,
+        'svix-timestamp': svixTimestamp,
+        'svix-signature': signature,
+      });
+      
+      // Add the verified event to the request
+      req.webhookEvent = evt;
+      next();
+    } catch (err) {
+      console.error('Webhook verification failed:', err);
       return res.status(400).json({ 
         success: false, 
         error: 'Invalid webhook signature' 
       });
     }
-
-    next();
   } catch (error) {
     console.error('Webhook verification error:', error);
     return res.status(500).json({ 

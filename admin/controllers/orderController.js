@@ -86,4 +86,42 @@ export const updateOrderStatus = async (req, res) => {
             error: error.message
         });
     }
+};
+
+// Delete order
+export const deleteOrder = async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id);
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: 'Order not found'
+            });
+        }
+
+        // Delete the order
+        await Order.findByIdAndDelete(req.params.id);
+
+        // Update user's orders array
+        await User.findByIdAndUpdate(order.userId, {
+            $pull: {
+                orders: {
+                    orderId: order._id
+                }
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Order deleted successfully'
+        });
+    } catch (error) {
+        console.error('Error deleting order:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error deleting order',
+            error: error.message
+        });
+    }
 }; 
