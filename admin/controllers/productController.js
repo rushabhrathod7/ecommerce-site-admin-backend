@@ -2,7 +2,7 @@
 import Product from "../models/Product.js";
 import Category from "../models/Category.js";
 import Subcategory from "../models/Subcategory.js";
-import cloudinary from "../config/cloudinary.js";
+import cloudinary from "../../shared/config/cloudinary.js";
 
 // Get all products with filtering, sorting, and pagination
 export const getAllProducts = async (req, res) => {

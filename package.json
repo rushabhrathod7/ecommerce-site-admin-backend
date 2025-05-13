@@ -13,6 +13,9 @@
   "type": "module",
   "description": "",
   "dependencies": {
+    "@clerk/backend": "^1.31.1",
+    "@clerk/clerk-sdk-node": "^4.13.23",
+    "@clerk/express": "^1.4.11",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.1",
@@ -27,8 +30,10 @@
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.16",
+    "razorpay": "^2.9.6",
     "resend": "^4.1.2",
-    "slugify": "^1.6.6"
+    "slugify": "^1.6.6",
+    "svix": "^1.64.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"

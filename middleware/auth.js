@@ -1,44 +1,44 @@
-// middleware/auth.js - Middleware to verify JWT tokens
+import jwt from 'jsonwebtoken';
+import { Clerk } from '@clerk/clerk-sdk-node';
+import Admin from '../admin/models/Admin.js';
+import User from '../user/models/User.js';
+import crypto from 'crypto';
 
-import jwt from "jsonwebtoken";
-import Admin from "../models/Admin.js";
+// Initialize Clerk
+const clerk = new Clerk({ 
+  secretKey: process.env.CLERK_SECRET_KEY 
+});
 
-export const verifyToken = async (req, res, next) => {
-  // Allow OPTIONS requests to pass through (for CORS preflight)
-  if (req.method === 'OPTIONS') {
-    return next();
-  }
-  
+// Middleware to verify admin JWT token
+export const verifyAdminToken = async (req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
+
   try {
-    // First check for cookie
     let token = req.cookies.admin_token;
-    
-    // If no cookie, check Authorization header
-    if (!token && req.headers.authorization) {
-      const authHeader = req.headers.authorization;
-      if (authHeader.startsWith('Bearer ')) {
-        token = authHeader.substring(7);
-      }
+
+    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+      token = req.headers.authorization.split(' ')[1];
     }
 
     if (!token) {
-      console.log('No token found in request');
-      return res
-        .status(401)
-        .json({ message: "Access denied. No token provided" });
+      return res.status(401).json({
+        success: false,
+        message: 'Access denied. No token provided',
+        error: 'NO_TOKEN',
+      });
     }
 
-    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Check if admin exists and is active
     const admin = await Admin.findById(decoded.id);
     if (!admin || !admin.isActive) {
-      console.log('Admin not found or inactive', decoded.id);
-      return res.status(401).json({ message: "Invalid or inactive account" });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or inactive account',
+        error: 'INVALID_ACCOUNT',
+      });
     }
 
-    // Add admin info to request
     req.admin = {
       id: decoded.id,
       role: decoded.role,
@@ -46,24 +46,144 @@ export const verifyToken = async (req, res, next) => {
 
     next();
   } catch (error) {
-    if (error.name === "TokenExpiredError") {
-      return res
-        .status(401)
-        .json({ message: "Token expired. Please login again" });
-    }
+    const errorMsg =
+      error.name === 'TokenExpiredError'
+        ? 'Token expired. Please login again'
+        : 'Invalid token';
 
-    console.error("Auth middleware error:", error);
-    res.status(401).json({ message: "Invalid token" });
+    return res.status(401).json({
+      success: false,
+      message: errorMsg,
+      error: error.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'INVALID_TOKEN',
+    });
   }
 };
 
-// Middleware to check if user is a superadmin
+// Middleware to verify Clerk-authenticated user
+export const verifyClerkAuth = async (req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
+
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Access denied. No token provided',
+        error: 'NO_TOKEN',
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
+    
+    try {
+      const { sub: clerkId } = await clerk.verifyToken(token);
+      
+      if (!clerkId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid token',
+          error: 'INVALID_TOKEN',
+        });
+      }
+
+      // Find or create user
+      let user = await User.findOne({ clerkId });
+
+      if (!user) {
+        // Get user data from Clerk
+        const clerkUser = await clerk.users.getUser(clerkId);
+        
+        // Create new user in MongoDB
+        user = new User({
+          clerkId,
+          email: clerkUser.emailAddresses[0]?.emailAddress || '',
+          firstName: clerkUser.firstName || '',
+          lastName: clerkUser.lastName || '',
+          username: clerkUser.username || '',
+          profileImageUrl: clerkUser.profileImageUrl || '',
+          emailVerified: clerkUser.emailAddresses[0]?.verification?.status === 'verified',
+          metadata: clerkUser.publicMetadata || {},
+        });
+
+        await user.save();
+      }
+
+      // Attach user to request
+      req.user = {
+        _id: user._id,
+        clerkId: user.clerkId,
+        email: user.email,
+      };
+
+      next();
+    } catch (error) {
+      console.error('Token verification error:', error);
+      return res.status(401).json({
+        success: false,
+        message: 'Token verification failed',
+        error: 'TOKEN_VERIFICATION_FAILED',
+      });
+    }
+  } catch (error) {
+    console.error('Clerk auth error:', error);
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication failed',
+      error: 'AUTH_FAILED',
+    });
+  }
+};
+
+// Middleware to check if admin is superadmin
 export const isSuperAdmin = (req, res, next) => {
-  if (req.admin && req.admin.role === "superadmin") {
+  if (req.admin?.role === 'superadmin') {
+    return next();
+  }
+
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied. Superadmin privileges required',
+    error: 'SUPERADMIN_REQUIRED',
+  });
+};
+
+// Middleware to verify Clerk webhook
+export const verifyClerkWebhook = async (req, res, next) => {
+  try {
+    const signature = req.headers['svix-signature'];
+    const svixId = req.headers['svix-id'];
+    const svixTimestamp = req.headers['svix-timestamp'];
+
+    if (!signature || !svixId || !svixTimestamp) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing webhook headers' 
+      });
+    }
+
+    // Verify webhook signature
+    const payload = JSON.stringify(req.body);
+    const signedContent = `${svixId}.${svixTimestamp}.${payload}`;
+    const secret = process.env.CLERK_WEBHOOK_SECRET;
+    
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(signedContent)
+      .digest('hex');
+
+    if (signature !== expectedSignature) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid webhook signature' 
+      });
+    }
+
     next();
-  } else {
-    res
-      .status(403)
-      .json({ message: "Access denied. Superadmin privileges required" });
+  } catch (error) {
+    console.error('Webhook verification error:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Webhook verification failed' 
+    });
   }
 };

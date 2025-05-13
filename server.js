@@ -3,14 +3,24 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
-import categoryRoutes from "./routes/categoryRoutes.js";
-import subcategoryRoutes from "./routes/subcategoryRoutes.js";
-import productRoutes from "./routes/productRoutes.js";
-import uploadRoutes from "./routes/uploadRoutes.js";
 
-import authRoutes from "./routes/auth.js";
-import adminRoutes from "./routes/admin.js";
-import { verifyToken } from "./middleware/auth.js";
+// Admin routes
+import adminRoutes from "./admin/routes/admin.js";
+import categoryRoutes from "./admin/routes/categoryRoutes.js";
+import subcategoryRoutes from "./admin/routes/subcategoryRoutes.js";
+import productRoutes from "./admin/routes/productRoutes.js";
+
+// User routes
+import userRoutes from "./user/routes/userRoutes.js";
+import paymentRoutes from './user/routes/paymentRoutes.js';
+import orderRoutes from './user/routes/orderRoutes.js';
+
+// Shared routes
+import authRoutes from "./shared/routes/auth.js";
+import publicRoutes from "./shared/routes/publicRoutes.js";
+import uploadRoutes from "./shared/routes/uploadRoutes.js";
+
+import { verifyAdminToken } from "./middleware/auth.js";
 
 // Load environment variables
 dotenv.config();
@@ -23,7 +33,7 @@ const app = express();
 // Configure CORS with options for cookies to work properly
 app.use(
   cors({
-    origin: [process.env.FRONTEND_URL || "http://localhost:5173", "https://api.cloudinary.com"],
+    origin: ["http://localhost:5173","http://localhost:5174", "https://api.cloudinary.com"],
     credentials: true, // Allow cookies to be sent with requests
   })
 );
@@ -32,15 +42,17 @@ app.use(
 app.use(cookieParser());
 
 // Body parser middleware
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increased limit for webhook payloads
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Mount routes
 app.use("/api/auth", authRoutes);
-app.use("/api/admin", verifyToken, adminRoutes);
-app.use("/api/categories", categoryRoutes);
-app.use("/api/subcategories", subcategoryRoutes);
-app.use("/api/products", productRoutes);
+app.use("/api", publicRoutes); // Public routes for products, categories, etc.
+app.use("/api/admin", verifyAdminToken, adminRoutes);
+app.use("/api/users", userRoutes); // Changed from /api/user to /api/users
 app.use("/api/upload", uploadRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/orders", orderRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {

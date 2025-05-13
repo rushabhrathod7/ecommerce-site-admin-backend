@@ -1,8 +1,8 @@
 // routes/uploadRoutes.js
 import express from "express";
 import multer from "multer";
-import cloudinary from "../config/cloudinary.js";
-import { verifyToken } from "../middleware/auth.js";
+import cloudinary from "../../config/cloudinary.js";
+import { verifyAdminToken } from "../../middleware/auth.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -47,7 +47,7 @@ const upload = multer({
 });
 
 // Route to upload a single image
-router.post('/', verifyToken, upload.single('image'), async (req, res) => {
+router.post('/', verifyAdminToken, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -95,7 +95,7 @@ router.post('/', verifyToken, upload.single('image'), async (req, res) => {
 });
 
 // Route to delete an image
-router.delete('/', verifyToken, async (req, res) => {
+router.delete('/', verifyAdminToken, async (req, res) => {
   try {
     const { public_id } = req.body;
     

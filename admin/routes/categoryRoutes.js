@@ -7,6 +7,7 @@ import {
   updateCategory,
   deleteCategory,
 } from "../controllers/categoryController.js";
+import { verifyAdminToken } from "../../middleware/auth.js";
 
 // Import subcategory routes to re-route
 import subcategoryRouter from "./subcategoryRoutes.js";
@@ -21,13 +22,13 @@ router.use("/:categoryId/subcategories", subcategoryRouter);
 // Add this line to re-route to product router
 router.use("/:categoryId/products", productRouter);
 
-// Basic CRUD routes
-router.route("/").get(getAllCategories).post(createCategory);
+// Public routes (no auth required)
+router.get("/", getAllCategories);
+router.get("/:id", getCategory);
 
-router
-  .route("/:id")
-  .get(getCategory)
-  .put(updateCategory)
-  .delete(deleteCategory);
+// Protected routes (admin only)
+router.post("/", verifyAdminToken, createCategory);
+router.put("/:id", verifyAdminToken, updateCategory);
+router.delete("/:id", verifyAdminToken, deleteCategory);
 
 export default router;

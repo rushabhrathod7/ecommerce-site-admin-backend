@@ -11,6 +11,7 @@ import {
   uploadProductImages,
   deleteProductImage
 } from "../controllers/productController.js";
+import { verifyAdminToken } from "../../middleware/auth.js";
 
 const router = express.Router({ mergeParams: true });
 
@@ -39,21 +40,16 @@ const upload = multer({
   fileFilter: fileFilter
 });
 
-// Search route
+// Public routes (no auth required)
 router.get("/search", searchProducts);
+router.get("/", getAllProducts);
+router.get("/:id", getProduct);
 
-// Image management routes
-router.post("/:id/images", upload.array('images', 5), uploadProductImages);
-router.delete("/:id/images/:imageId", deleteProductImage);
-
-// Basic CRUD routes with file upload for product creation and updates
-router.route("/")
-  .get(getAllProducts)
-  .post(upload.array('images', 5), createProduct);
-
-router.route("/:id")
-  .get(getProduct)
-  .put(upload.array('images', 5), updateProduct)
-  .delete(deleteProduct);
+// Protected routes (admin only)
+router.post("/", verifyAdminToken, upload.array('images', 5), createProduct);
+router.put("/:id", verifyAdminToken, upload.array('images', 5), updateProduct);
+router.delete("/:id", verifyAdminToken, deleteProduct);
+router.post("/:id/images", verifyAdminToken, upload.array('images', 5), uploadProductImages);
+router.delete("/:id/images/:imageId", verifyAdminToken, deleteProductImage);
 
 export default router;

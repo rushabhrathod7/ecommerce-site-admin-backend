@@ -2,7 +2,7 @@
 import Subcategory from "../models/Subcategory.js";
 import Category from "../models/Category.js";
 import Product from "../models/Product.js";
-import cloudinary from "../config/cloudinary.js";
+import cloudinary from "../../shared/config/cloudinary.js";
 
 // Get all subcategories
 export const getAllSubcategories = async (req, res) => {

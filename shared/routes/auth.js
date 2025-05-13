@@ -2,15 +2,15 @@
 
 import express from "express";
 import jwt from "jsonwebtoken";
-import Admin from "../models/Admin.js";
-import { verifyToken } from "../middleware/auth.js";
-import { sendPasswordResetEmail } from "../utils/emailService.js";
+import Admin from "../../admin/models/Admin.js";
+import { verifyAdminToken } from "../../middleware/auth.js";
+import { sendPasswordResetEmail } from "../../utils/emailService.js";
 import crypto from "crypto";
 
 const router = express.Router();
 
 // Register a new admin (protected - only existing admins can create new ones)
-router.post("/register", verifyToken, async (req, res) => {
+router.post("/register", verifyAdminToken, async (req, res) => {
   try {
     // Check if requester is superadmin for added security
     if (req.admin.role !== "superadmin") {
@@ -107,7 +107,7 @@ router.post("/login", async (req, res) => {
 });
 
 // Auth check route - simple endpoint to verify if a user is authenticated
-router.get("/check", verifyToken, async (req, res) => {
+router.get("/check", verifyAdminToken, async (req, res) => {
   try {
     // If verifyToken middleware passed, the user is authenticated
     // Return minimal info to confirm authentication
@@ -129,7 +129,7 @@ router.post("/logout", (req, res) => {
 });
 
 // Get current admin profile
-router.get("/me", verifyToken, async (req, res) => {
+router.get("/me", verifyAdminToken, async (req, res) => {
   try {
     const admin = await Admin.findById(req.admin.id).select("-password");
     if (!admin) {
@@ -144,7 +144,7 @@ router.get("/me", verifyToken, async (req, res) => {
 });
 
 // Change password
-router.put("/change-password", verifyToken, async (req, res) => {
+router.put("/change-password", verifyAdminToken, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
@@ -248,5 +248,7 @@ router.post("/reset-password/:token", async (req, res) => {
   // console.log("Hashed received token:", resetPasswordToken);
   // console.log("Admin found with token:", Admin ? "Yes" : "No");
 });
+
+router.get("/verify", verifyAdminToken, verifyAdminToken);
 
 export default router;

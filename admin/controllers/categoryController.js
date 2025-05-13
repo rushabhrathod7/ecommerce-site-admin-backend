@@ -1,7 +1,7 @@
 // controllers/categoryController.js
 import Category from "../models/Category.js";
 import Subcategory from "../models/Subcategory.js";
-import cloudinary from "../config/cloudinary.js";
+import cloudinary from "../../shared/config/cloudinary.js";
 
 // Get all categories
 export const getAllCategories = async (req, res) => {
